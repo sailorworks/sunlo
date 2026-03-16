@@ -137,59 +137,96 @@ class AudioStreamPlayer {
 }
 
 /**
- * Fetches TTS audio via SSE from the backend and plays it in real-time.
- * @param {string} text - Full article text
- * @param {string} voiceId - Smallest AI voice ID
- * @param {AudioStreamPlayer} player - Audio player instance
- * @param {AbortSignal} signal - For cancellation
- * @param {function} onProgress - Called with { phase, elapsed, total }
- * @returns {Promise<void>} Resolves when all audio finishes playing
+ * Streams TTS from our backend and plays it gaplessly using AudioStreamPlayer.
  */
-async function streamTTSAndPlay(text, voiceId, player, signal, onProgress) {
-  const res = await fetch(`${TTS_SERVER}/api/tts-stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voice_id: voiceId }),
-    signal,
-  });
+async function streamTTSAndPlay(text, voice_id, player, signal, onStatusChange) {
+  console.log(`[TTP] 📡 Preparing to stream audio for voice: ${voice_id}, text length: ${text.length}`);
+  try {
+    if (onStatusChange) onStatusChange({ phase: "streaming" });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`TTS failed (${res.status}): ${err}`);
-  }
+    // The backend endpoint
+    const url = "http://localhost:3456/api/tts-stream";
+    console.log(`[TTP] 📡 Fetching from: ${url}`);
 
-  player.reset();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voice_id }),
+      signal,
+    });
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+    console.log(`[TTP] 📡 Fetch response status: ${res.status} ${res.statusText}`);
 
-  if (onProgress) onProgress({ phase: "streaming" });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`TTS failed (${res.status}): ${err}`);
+    }
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    player.reset();
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let chunksReceived = 0;
+    let hasStartedPlaying = false;
 
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      try {
-        const payload = JSON.parse(line.slice(6));
-        if (payload.error) throw new Error(`TTS error: ${payload.error}`);
-        if (payload.done) break;
-        if (payload.audio) {
-          player.appendChunk(payload.audio);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        console.log(`[TTP] 🛑 Stream reading complete. Received ${chunksReceived} chunks.`);
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const dataStr = line.slice(6).trim();
+        
+        if (dataStr === "[DONE]") {
+          console.log("[TTP] 📡 Received [DONE] signal from server.");
+          continue;
         }
-      } catch (e) {
-        if (e.message.startsWith("TTS error")) throw e;
+
+        try {
+          const payload = JSON.parse(dataStr);
+          if (payload.error) {
+            console.error("[TTP] ❌ Server SSE Error:", payload.error);
+            throw new Error(`TTS error: ${payload.error}`);
+          }
+          if (payload.done) break;
+          
+          if (payload.audio) {
+            chunksReceived++;
+            if (chunksReceived === 1) {
+              console.log(`[TTP] 🎵 First audio chunk received! Length: ${payload.audio.length}`);
+              if (onStatusChange) onStatusChange({ phase: "playing" });
+            }
+            if (chunksReceived % 10 === 0) {
+              console.log(`[TTP] 🎵 Received ${chunksReceived} audio chunks so far...`);
+            }
+            player.appendChunk(payload.audio);
+          }
+        } catch (e) {
+          if (e.message.startsWith("TTS error")) throw e;
+          // Ignore general parse errors on incomplete chunks
+        }
       }
     }
-  }
 
-  if (onProgress) onProgress({ phase: "playing" });
-  await player.waitUntilDone();
-  if (onProgress) onProgress({ phase: "done" });
+    console.log("[TTP] ⏳ Waiting for audio playback to finish...");
+    await player.waitUntilDone();
+    console.log("[TTP] ✅ Audio playback finished.");
+    if (onStatusChange) onStatusChange({ phase: "done" });
+
+  } catch (error) {
+    if (error.name === "AbortError") {
+      console.log("[TTP] 🛑 Audio stream aborted by user.");
+    } else {
+      console.error("[TTP] ❌ Stream error:", error);
+    }
+    throw error;
+  }
 }

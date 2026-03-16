@@ -9,7 +9,7 @@
 
   console.log("[TTP] ✅ Content script loaded on:", window.location.href);
 
-  const VOICE_ID = "emily";
+  const VOICE_ID = "magnus"; // Default Smallest AI voice
   let player = null;
   let abortController = null;
   let progressInterval = null;
