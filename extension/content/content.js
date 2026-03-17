@@ -140,13 +140,18 @@
     startProgressUpdater();
 
     try {
-      await streamTTSAndPlay(text, VOICE_ID, player, abortController.signal, ({ phase }) => {
+      await streamTTSAndPlay(text, VOICE_ID, player, abortController.signal, ({ phase, currentChunk, totalChunks }) => {
         currentPhase = phase;
-        console.log(`[TTP] Phase: ${phase}`);
+        console.log(`[TTP] Phase: ${phase}${currentChunk ? ` (chunk ${currentChunk}/${totalChunks})` : ""}`);
         if (phase === "streaming") {
-          updatePlayerStatus('Streaming audio<span class="ttp-streaming-dots"></span>');
+          updatePlayerStatus('Connecting<span class="ttp-streaming-dots"></span>');
+        } else if (phase === "generating") {
+          const chunkInfo = currentChunk && totalChunks
+            ? ` (${currentChunk}/${totalChunks} chunks)`
+            : "";
+          updatePlayerStatus(`Generating audio${chunkInfo}<span class="ttp-streaming-dots"></span>`);
         } else if (phase === "playing") {
-          updatePlayerStatus("Playing audio...");
+          updatePlayerStatus("🔊 Playing audio...");
         } else if (phase === "done") {
           updatePlayerStatus("✓ Finished");
           currentPhase = "done";

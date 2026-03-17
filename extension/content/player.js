@@ -7,7 +7,7 @@
  */
 
 const TTS_SERVER = "http://localhost:3456";
-const SAMPLE_RATE = 44100;
+const SAMPLE_RATE = 24000;
 
 class AudioStreamPlayer {
   constructor() {
@@ -173,7 +173,15 @@ async function streamTTSAndPlay(text, voice_id, player, signal, onStatusChange) 
       const payload = message.payload;
 
       if (payload.status === "connected") {
-        console.log("[TTP] 📡 Background connected to server.");
+        console.log("[TTP] 📡 Connected to Smallest AI. Generating audio...");
+        if (onStatusChange) onStatusChange({ phase: "generating" });
+        return;
+      }
+
+      if (payload.progress) {
+        const { currentChunk, totalChunks } = payload.progress;
+        console.log(`[TTP] 📊 Text chunk ${currentChunk}/${totalChunks} being processed...`);
+        if (onStatusChange) onStatusChange({ phase: "generating", currentChunk, totalChunks });
         return;
       }
 
@@ -185,7 +193,7 @@ async function streamTTSAndPlay(text, voice_id, player, signal, onStatusChange) 
       }
 
       if (payload.done) {
-        console.log(`[TTP] 🛑 Stream complete. Received ${chunksReceived} audio chunks.`);
+        console.log(`[TTP] 🛑 Stream complete. Received ${chunksReceived} audio batches.`);
         streamDone = true;
         // Wait for audio playback to finish before resolving
         player.waitUntilDone().then(() => {
@@ -200,13 +208,17 @@ async function streamTTSAndPlay(text, voice_id, player, signal, onStatusChange) 
       if (payload.audio) {
         chunksReceived++;
         if (chunksReceived === 1) {
-          console.log(`[TTP] 🎵 First audio chunk received! Length: ${payload.audio.length}`);
+          console.log(`[TTP] 🎵 First audio batch received! Base64 length: ${payload.audio.length}`);
           if (onStatusChange) onStatusChange({ phase: "playing" });
         }
-        if (chunksReceived % 10 === 0) {
-          console.log(`[TTP] 🎵 Received ${chunksReceived} audio chunks so far...`);
+        console.log(`[TTP] 🎵 Audio batch #${chunksReceived} received (${payload.audio.length} base64 chars)`);
+        try {
+          player.appendChunk(payload.audio);
+          console.log(`[TTP] ✅ Audio batch #${chunksReceived} decoded & scheduled. Total duration: ${player.getTotalDuration().toFixed(1)}s`);
+        } catch (e) {
+          console.error(`[TTP] ❌ Failed to decode audio batch #${chunksReceived}:`, e.message);
+          console.error(`[TTP]   Base64 preview: "${payload.audio.substring(0, 40)}..." (length: ${payload.audio.length})`);
         }
-        player.appendChunk(payload.audio);
       }
     };
 
