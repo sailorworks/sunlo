@@ -93,5 +93,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }).catch(() => {
       // Tab may have been closed
     });
+  } else if (message.type === "STOP_TTS_STREAM") {
+    // Manually intercept a global stop command from the frontend 
+    console.log("[TTP-BG] ⏹ Received STOP_TTS_STREAM, relaying to offscreen...");
+    chrome.runtime.sendMessage({ type: "OFFSCREEN_STOP_TTS" }).catch(() => {});
   }
 });

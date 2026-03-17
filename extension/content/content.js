@@ -10,7 +10,7 @@
   console.log("[TTP] ✅ Content script loaded on:", window.location.href);
 
   const VOICE_ID = "magnus"; // Default Smallest AI voice
-  let player = null;
+  let player = new AudioStreamPlayer();
   let abortController = null;
   let progressInterval = null;
   let currentPhase = "idle";
@@ -43,7 +43,9 @@
 
   // ── Inject the player UI ─────────────────────────────────────────────────
   function injectPlayerUI() {
-    if (document.getElementById("ttp-player")) return;
+    const oldPanel = document.getElementById("ttp-player");
+    if (oldPanel) oldPanel.remove();
+    
     console.log("[TTP] 🎧 Injecting player UI");
 
     const panel = document.createElement("div");
@@ -134,7 +136,9 @@
       playerEl.classList.add("is-visible");
     }
 
-    player = new AudioStreamPlayer();
+    // Stop any existing playback and reuse the single instance
+    player.stop();
+    if (abortController) abortController.abort();
     abortController = new AbortController();
     currentPhase = "streaming";
     startProgressUpdater();
@@ -182,13 +186,22 @@
   }
 
   function handleStop() {
-    console.log("[TTP] ⏹ Stop clicked");
+    console.log("[TTP] ⏹ Stop clicked or navigation detected");
     if (abortController) abortController.abort();
-    if (player) player.stop();
+    if (player) {
+      player.stop();
+    }
     stopProgressUpdater();
     removePlayerUI();
     currentPhase = "idle";
-    player = null;
+    
+    // Explicitly notify background script to terminate the stream
+    try {
+      chrome.runtime.sendMessage({ type: "STOP_TTS_STREAM" });
+    } catch (e) {
+      console.log("[TTP] Background script unreachable for stop command.");
+    }
+    
     abortController = null;
     checkForArticle();
   }

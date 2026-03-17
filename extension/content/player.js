@@ -32,7 +32,10 @@ class AudioStreamPlayer {
       this.gainNode.connect(this.analyser);
       this.analyser.connect(this.ctx.destination);
     }
-    if (this.ctx.state === "suspended") this.ctx.resume();
+    // Only automatically resume the context if the user hasn't explicitly paused it
+    if (this.ctx.state === "suspended" && !this._paused) {
+      this.ctx.resume();
+    }
   }
 
   appendChunk(base64Audio) {
