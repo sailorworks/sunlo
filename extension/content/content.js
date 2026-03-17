@@ -36,7 +36,8 @@
     const btn = document.getElementById("ttp-listen-btn");
     if (btn) {
       console.log("[TTP] Removing listen button");
-      btn.remove();
+      btn.classList.add("is-hidden");
+      setTimeout(() => btn.remove(), 400); // Wait for transition
     }
   }
 
@@ -48,31 +49,20 @@
     const panel = document.createElement("div");
     panel.id = "ttp-player";
     panel.innerHTML = `
-      <div id="ttp-player-header">
-        <div class="ttp-title">
-          <div class="ttp-dot"></div>
-          <span>🎧 Listening to thread</span>
-        </div>
-        <button id="ttp-player-close">✕</button>
-      </div>
-      <div id="ttp-player-controls">
-        <button class="ttp-ctrl-btn" id="ttp-skip-back" title="Back 10s">⏪</button>
+      <div class="ttp-player-inner">
         <button class="ttp-ctrl-btn ttp-play-pause" id="ttp-play-pause" title="Pause">⏸</button>
-        <button class="ttp-ctrl-btn" id="ttp-skip-fwd" title="Forward 10s">⏩</button>
-      </div>
-      <div id="ttp-player-progress">
-        <div id="ttp-progress-bar-container">
-          <div id="ttp-progress-bar"></div>
+        <div class="ttp-player-track-info">
+          <div id="ttp-player-status"><span>Starting...</span></div>
+          <div id="ttp-player-progress">
+            <span id="ttp-time-current">0:00</span>
+            <div id="ttp-progress-bar-container">
+              <div id="ttp-progress-bar"></div>
+            </div>
+            <span id="ttp-time-total">--:--</span>
+          </div>
         </div>
-        <div id="ttp-time-display">
-          <span id="ttp-time-current">0:00</span>
-          <span id="ttp-time-total">--:--</span>
-        </div>
+        <button id="ttp-player-close" title="Close">✕</button>
       </div>
-      <div id="ttp-player-status">
-        <span>Streaming audio<span class="ttp-streaming-dots"></span></span>
-      </div>
-      <div id="ttp-player-footer">Powered by Smallest AI</div>
     `;
     document.body.appendChild(panel);
 
@@ -131,8 +121,18 @@
     }
     console.log(`[TTP] Extracted ${tweetCount} tweets, ${text.length} chars. Starting TTS...`);
 
-    removeListenButton();
+    const listenBtn = document.getElementById("ttp-listen-btn");
+    if (listenBtn) {
+      listenBtn.classList.add("is-hidden");
+    }
+
     injectPlayerUI();
+    const playerEl = document.getElementById("ttp-player");
+    if (playerEl) {
+      // Force reflow
+      void playerEl.offsetWidth;
+      playerEl.classList.add("is-visible");
+    }
 
     player = new AudioStreamPlayer();
     abortController = new AbortController();
@@ -146,10 +146,7 @@
         if (phase === "streaming") {
           updatePlayerStatus('Connecting<span class="ttp-streaming-dots"></span>');
         } else if (phase === "generating") {
-          const chunkInfo = currentChunk && totalChunks
-            ? ` (${currentChunk}/${totalChunks} chunks)`
-            : "";
-          updatePlayerStatus(`Generating audio${chunkInfo}<span class="ttp-streaming-dots"></span>`);
+          updatePlayerStatus(`Generating audio<span class="ttp-streaming-dots"></span>`);
         } else if (phase === "playing") {
           updatePlayerStatus("🔊 Playing audio...");
         } else if (phase === "done") {
