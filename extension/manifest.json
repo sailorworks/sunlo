@@ -3,7 +3,8 @@
   "name": "Thread to Podcast — Smallest AI TTS",
   "description": "Turn long Twitter/X threads into audio podcasts instantly, powered by Smallest AI.",
   "version": "1.0.0",
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "offscreen"],
+  "host_permissions": ["http://localhost:3456/*", "https://api.smallest.ai/*"],
   "content_scripts": [
     {
       "matches": ["*://x.com/*", "*://twitter.com/*"],
