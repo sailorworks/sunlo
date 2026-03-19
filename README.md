@@ -64,7 +64,7 @@ This extension leverages Chrome's Manifest V3 **Offscreen Documents** to bypass 
 
 ## 🔑 Get your API Key
 
-1. Visit [console.smallest.ai](https://console.smallest.ai)
+1. Visit [app.smallest.ai](https://app.smallest.ai/)
 2. Sign up / log in to your dashboard.
 3. Navigate to the **API Keys** tab and create a new key.
 4. Paste it into the `server/.env` file:

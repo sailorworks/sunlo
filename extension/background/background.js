@@ -6,8 +6,20 @@
  * This script just relays messages between the content script and the offscreen doc.
  */
 
+const STORAGE_KEY = "smallestApiKey";
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log("[TTP-BG] Extension installed.");
+
+  // Open an onboarding tab so the user can paste their API key
+  // without needing to visit Twitter/X first.
+  try {
+    const url = chrome.runtime.getURL("popup/popup.html");
+    console.log("[TTP-BG] 🪟 Opening onboarding tab:", url);
+    chrome.tabs.create({ url }).catch(() => {});
+  } catch (e) {
+    console.log("[TTP-BG] ⚠ Failed to open onboarding tab:", e);
+  }
 });
 
 let creatingOffscreen = null;
@@ -53,20 +65,37 @@ chrome.runtime.onConnect.addListener((port) => {
 
   port.onMessage.addListener(async (message) => {
     if (message.type === "START_TTS") {
-      console.log("[TTP-BG] ▶ Relaying START_TTS to offscreen document...");
+      console.log("[TTP-BG] ▶ START_TTS received. Loading API key from storage...");
 
       try {
+        const result = await chrome.storage.local.get(STORAGE_KEY);
+        const apiKey = (result && result[STORAGE_KEY]) ? String(result[STORAGE_KEY]).trim() : "";
+
+        if (!apiKey) {
+          console.log("[TTP-BG] ⚠ No API key found in storage. Telling content script to show setup.");
+          try {
+            port.postMessage({
+              type: "TTS_ERROR",
+              error: "Smallest AI API key not set. Click the extension icon to configure it.",
+            });
+          } catch (e) { /* port may be closed */ }
+          return;
+        }
+
+        console.log("[TTP-BG] 🔑 API key found. Ensuring offscreen document and relaying START_TTS...");
+
         await ensureOffscreenDocument();
 
-        // Forward to offscreen document
+        // Forward to offscreen document, including the API key
         chrome.runtime.sendMessage({
           type: "OFFSCREEN_START_TTS",
           text: message.text,
           voice_id: message.voice_id,
-          tabId: tabId
+          tabId: tabId,
+          apiKey,
         });
       } catch (err) {
-        console.error("[TTP-BG] ❌ Failed to create offscreen doc:", err);
+        console.error("[TTP-BG] ❌ Failed to prepare offscreen TTS:", err);
         try {
           port.postMessage({ type: "TTS_ERROR", error: err.message });
         } catch (e) { /* port closed */ }

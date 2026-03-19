@@ -9,12 +9,10 @@
  */
 
 const SSE_URL = "https://api.smallest.ai/waves/v1/lightning-v3.1/stream";
-const KEY_URL = "http://localhost:3456/api/key";
 const MAX_CHUNK_SIZE = 250;
 const BYTE_BUFFER_SIZE = 32768; // Buffer ~32KB of raw PCM bytes before sending
 
 let currentAbortController = null;
-let cachedApiKey = null;
 
 console.log("[TTP-OFF] ✅ Offscreen document loaded.");
 
@@ -76,20 +74,6 @@ function chunkText(text, maxChunkSize = MAX_CHUNK_SIZE) {
   }
 
   return chunks;
-}
-
-async function getApiKey() {
-  if (cachedApiKey) return cachedApiKey;
-
-  console.log("[TTP-OFF] 🔑 Fetching API key from local server...");
-  const response = await fetch(KEY_URL);
-  if (!response.ok) {
-    throw new Error(`Failed to get API key: ${response.status}`);
-  }
-  const data = await response.json();
-  cachedApiKey = data.api_key;
-  console.log("[TTP-OFF] 🔑 API key retrieved successfully.");
-  return cachedApiKey;
 }
 
 // ── Send a buffered audio batch to the player ───────────────────────────────
@@ -207,15 +191,13 @@ async function streamSingleChunk(text, apiKey, tabId, signal) {
   return audioChunksSent;
 }
 
-async function handleTTSStream(text, voiceId, tabId) {
+async function handleTTSStream(text, voiceId, tabId, apiKey) {
   console.log(`[TTP-OFF] ▶ Starting TTS stream. Text length: ${text.length}, Voice: ${voiceId}`);
 
   currentAbortController = new AbortController();
   const { signal } = currentAbortController;
 
   try {
-    const apiKey = await getApiKey();
-
     // Pre-chunk text per Smallest AI best practices (max 250 chars)
     const textChunks = chunkText(text, MAX_CHUNK_SIZE);
     console.log(`[TTP-OFF] 📝 Split text into ${textChunks.length} chunks (max ${MAX_CHUNK_SIZE} chars each).`);
@@ -282,7 +264,7 @@ async function handleTTSStream(text, voiceId, tabId) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "OFFSCREEN_START_TTS") {
     console.log("[TTP-OFF] 📩 Received OFFSCREEN_START_TTS");
-    handleTTSStream(message.text, message.voice_id, message.tabId);
+    handleTTSStream(message.text, message.voice_id, message.tabId, message.apiKey);
     sendResponse({ ok: true });
   } else if (message.type === "OFFSCREEN_STOP_TTS") {
     console.log("[TTP-OFF] ⏹ Received OFFSCREEN_STOP_TTS");
