@@ -8,17 +8,7 @@ One click. Any long article becomes a podcast you can listen to while scrolling,
 
 ## 🧭 User Flow
 
-**Install → Set key → Listen**
-
-`User installs extension` ➜  
-`Chrome opens API key setup tab` ➜  
-`User pastes Smallest AI API key & saves` ➜  
-`Key stored in chrome.storage.local` ➜  
-`User opens Twitter/X article or thread` ➜  
-`“🔊 Listen to article/thread” button appears` ➜  
-`User clicks Listen, audio player shows` ➜  
-`Audio streams from Smallest AI & plays` ➜  
-`User can pause/stop or change key via extension icon`
+> End-to-end run: install extension → set API key → open Twitter/X article → click “Listen to article/thread” → audio player streams from Smallest AI → user listens / pauses / stops
 
 ---
 
@@ -43,27 +33,15 @@ Click it! The extension will generate and stream high-quality audio back to you 
 This extension leverages Chrome's Manifest V3 **Offscreen Documents** to bypass aggressive background-script network timeouts, allowing for a stable, long-lived Server-Sent Events (SSE) connection directly to Smallest AI.
 
 ```mermaid
-flowchart TD
-  user[User] -->|installs| chromeExtensions[ChromeExtensions]
-  chromeExtensions -->|onInstalled| onboardingTab[OnboardingTab "popup.html (API key UI)"]
-
-  onboardingTab -->|save key| chromeStorage[chrome.storage.local]
-
-  user -->|visits X article/thread| contentScript[content.js]
-  contentScript --> extractor[extractor.js]
-  extractor -->|article text| contentScript
-
-  contentScript -->|START_TTS via Port| backgroundSW[background.js]
-  backgroundSW -->|read key| chromeStorage
-  backgroundSW -->|text + key| offscreenDoc[offscreen.js]
-
-  offscreenDoc -->|SSE POST| smallestAPI["Smallest AI TTS API"]
-  smallestAPI -->|PCM audio chunks| offscreenDoc
-
-  offscreenDoc -->|TTS_CHUNK messages| backgroundSW
-  backgroundSW -->|relay TTS_CHUNK| contentScript
-  contentScript --> player[player.js]
-  player -->|playback| user
+graph LR
+  A[User] --> B[Install Extension]
+  B --> C[API Key Setup Tab]
+  C --> D[Store Key (chrome.storage.local)]
+  D --> E[Visit Twitter/X Article]
+  E --> F[Listen Button Injected]
+  F --> G[Background + Offscreen Stream TTS]
+  G --> H[Audio Player (player.js)]
+  H --> I[User Listens]
 ```
 
 ### How text becomes audio:
