@@ -8,7 +8,7 @@ One click. Any long article becomes a podcast you can listen to while scrolling,
 
 ## 🧭 User Flow
 
-> End-to-end run: install extension → set API key → open Twitter/X article → click “Listen to article/thread” → audio player streams from Smallest AI → user listens / pauses / stops
+> End-to-end run: install extension → set API key → open Twitter/X article → click "Listen to article/thread" → audio player streams from Smallest AI → user listens / pauses / stops
 
 ---
 
@@ -31,17 +31,16 @@ Click it! The extension will generate and stream high-quality audio back to you 
 ## 🏗 Architecture & Data Flow
 
 This extension leverages Chrome's Manifest V3 **Offscreen Documents** to bypass aggressive background-script network timeouts, allowing for a stable, long-lived Server-Sent Events (SSE) connection directly to Smallest AI.
-
 ```mermaid
 graph LR
-  A[User] --> B[Install Extension]
+  A([User]) --> B[Install Extension]
   B --> C[API Key Setup Tab]
-  C --> D[Store Key (chrome.storage.local)]
-  D --> E[Visit Twitter/X Article]
+  C --> D[("Store Key\nchrome.storage.local")]
+  D --> E([Visit Twitter/X Article])
   E --> F[Listen Button Injected]
-  F --> G[Background + Offscreen Stream TTS]
-  G --> H[Audio Player (player.js)]
-  H --> I[User Listens]
+  F --> G[[Background + Offscreen Stream TTS]]
+  G --> H[/"Audio Player\nplayer.js"/]
+  H --> I([User Listens])
 ```
 
 ### How text becomes audio:
@@ -72,7 +71,7 @@ graph LR
 1. Visit [app.smallest.ai](https://app.smallest.ai/)
 2. Sign up / log in to your dashboard.
 3. Navigate to the **API Keys** tab and create a new key.
-4. When the extension opens the onboarding tab (or when you click the extension icon), paste your key into the **API key** field and click **Save**. The key is stored only in your browser’s extension storage and used solely to call Smallest AI’s TTS API.
+4. When the extension opens the onboarding tab (or when you click the extension icon), paste your key into the **API key** field and click **Save**. The key is stored only in your browser's extension storage and used solely to call Smallest AI's TTS API.
 
 ---
 
