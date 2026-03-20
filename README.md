@@ -1,34 +1,37 @@
 # Article to Podcast 🎧 (Twitter TTS Extension)
 
-**Turn long Twitter/X articles and articles into audio — powered by Smallest AI Lightning TTS.**
+**Turn long Twitter/X articles into audio — powered by Smallest AI Lightning TTS.**
 
 One click. Any long article becomes a podcast you can listen to while scrolling, streaming directly to your browser with low latency.
 
 ---
 
+## 🧭 User Flow
+
+**Install → Set key → Listen**
+
+`User installs extension` ➜  
+`Chrome opens API key setup tab` ➜  
+`User pastes Smallest AI API key & saves` ➜  
+`Key stored in chrome.storage.local` ➜  
+`User opens Twitter/X article or thread` ➜  
+`“🔊 Listen to article/thread” button appears` ➜  
+`User clicks Listen, audio player shows` ➜  
+`Audio streams from Smallest AI & plays` ➜  
+`User can pause/stop or change key via extension icon`
+
+---
+
 ## 🚀 Quick Start
 
-### 1. Start the Secure Key Server
-
-The extension needs your API key to connect to Smallest AI. To keep it secure and out of your client-side code, a tiny local server provides it.
-
-```bash
-cd server
-cp .env.example .env
-# Edit .env and paste your SMALLEST_API_KEY
-npm install
-npm start
-```
-*The server runs on `http://localhost:3456` and serves the key via `GET /api/key`.*
-
-### 2. Load the Chrome Extension
+### 1. Load the Chrome Extension
 
 1. Open Chrome and type `chrome://extensions` in the URL bar.
 2. Toggle **Developer mode** on (top right corner).
 3. Click **Load unpacked** and select the `extension/` folder from this repository.
-4. Navigate to any X Article page.
+4. On first install, a new tab will open with a Smallest AI **API key setup** screen. Paste your key and hit **Save**.
 
-### 3. Listen!
+### 2. Listen!
 
 A floating **🔊 Listen to article** button will appear in the bottom corner of long posts.  
 Click it! The extension will generate and stream high-quality audio back to you seamlessly via an injected audio player UI.
@@ -39,9 +42,33 @@ Click it! The extension will generate and stream high-quality audio back to you 
 
 This extension leverages Chrome's Manifest V3 **Offscreen Documents** to bypass aggressive background-script network timeouts, allowing for a stable, long-lived Server-Sent Events (SSE) connection directly to Smallest AI.
 
+```mermaid
+flowchart TD
+  user[User] -->|installs| chromeExtensions[ChromeExtensions]
+  chromeExtensions -->|onInstalled| onboardingTab[OnboardingTab "popup.html (API key UI)"]
+
+  onboardingTab -->|save key| chromeStorage[chrome.storage.local]
+
+  user -->|visits X article/thread| contentScript[content.js]
+  contentScript --> extractor[extractor.js]
+  extractor -->|article text| contentScript
+
+  contentScript -->|START_TTS via Port| backgroundSW[background.js]
+  backgroundSW -->|read key| chromeStorage
+  backgroundSW -->|text + key| offscreenDoc[offscreen.js]
+
+  offscreenDoc -->|SSE POST| smallestAPI["Smallest AI TTS API"]
+  smallestAPI -->|PCM audio chunks| offscreenDoc
+
+  offscreenDoc -->|TTS_CHUNK messages| backgroundSW
+  backgroundSW -->|relay TTS_CHUNK| contentScript
+  contentScript --> player[player.js]
+  player -->|playback| user
+```
+
 ### How text becomes audio:
 1. **Extraction:** The `content.js` script observes the DOM and uses `extractor.js` to grab clean text from articles.
-2. **Key Fetch:** When you hit "play", the offscreen document safely requests the API key from your local server.
+2. **Key Fetch:** On first install, the extension opens an onboarding tab (`popup.html`) where you paste your Smallest AI API key. The key is stored locally via `chrome.storage.local`. When you hit "play", the background service worker reads this key and passes it to the offscreen document.
 3. **Chunking:** The offscreen document chunks the extracted text into blocks of ≤250 characters (Smallest AI's best practices) to prevent API timeouts.
 4. **Direct SSE Stream:** `offscreen.js` sends chunk requests sequentially to `api.smallest.ai/.../stream`.
 5. **Byte Buffering:** As base64 chunks drip in over SSE, the offscreen document decodes them to raw PCM bytes, buffers them to ~32KB blocks to reduce message overhead, and re-encodes to base64.
@@ -58,7 +85,7 @@ This extension leverages Chrome's Manifest V3 **Offscreen Documents** to bypass 
 | **Web Audio API** | `extension/content/player.js` | Gapless PCM chunk player handling 24kHz audio using `AudioContext` and buffering states. |
 | **Offscreen Streamer** | `extension/offscreen/offscreen.js` | The streaming engine. Connects to Smallest AI via SSE, chunks long texts, buffers audio bytes, and relays safely to the player. |
 | **Service Worker** | `extension/background/background.js` | Creates the Offscreen Document and manages passing messages between `content.js` and `offscreen.js`. |
-| **Key Server** | `server/index.js` | Minimal Express server to serve your secret API key safely (`GET /api/key`). |
+| **Key Storage** | `extension/popup/popup.{html,js}` | Onboarding UI where the user pastes their Smallest AI API key, stored locally via `chrome.storage.local`. |
 
 ---
 
@@ -67,10 +94,7 @@ This extension leverages Chrome's Manifest V3 **Offscreen Documents** to bypass 
 1. Visit [app.smallest.ai](https://app.smallest.ai/)
 2. Sign up / log in to your dashboard.
 3. Navigate to the **API Keys** tab and create a new key.
-4. Paste it into the `server/.env` file:
-   ```env
-   SMALLEST_API_KEY="your-secret-key-here"
-   ```
+4. When the extension opens the onboarding tab (or when you click the extension icon), paste your key into the **API key** field and click **Save**. The key is stored only in your browser’s extension storage and used solely to call Smallest AI’s TTS API.
 
 ---
 
